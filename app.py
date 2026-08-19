@@ -12,41 +12,71 @@ except ImportError:
     st.stop()
 
 # إعدادات الصفحة
-st.set_page_config(page_title="اختبار قانون العمل الأردني (100%)", layout="centered")
-st.title("📝 اختبار شامل في قانون العمل الأردني (526 سؤال)")
-st.markdown("تغطية 100% لنصوص قانون العمل رقم 8 لسنة 1996 وقانون العمل المهني رقم 11 لسنة 2019.")
+st.set_page_config(page_title="اختبار قانون العمل الأردني (Modules)", layout="centered")
+st.title("📚 اختبار قانون العمل الأردني - حسب المواضيع")
+st.markdown("اختر الموضوع الذي تريد التدرب عليه، واختبر معرفتك في كل فرع على حدة.")
 
-# تهيئة حالة الجلسة (Session State)
-if "index" not in st.session_state:
+# --- استخراج قائمة المواضيع الفريدة من البيانات ---
+all_topics = sorted(list(set([q.get('topic', 'مواضيع عامة') for q in questions])))
+all_topics.insert(0, "☑️ الكل (جميع المواضيع)") # إضافة خيار الاختبار الشامل
+
+# --- عرض قائمة اختيار الموضوع ---
+selected_topic = st.selectbox("اختر الموضوع الذي تريد التدرب عليه:", all_topics)
+
+# --- تصفية الأسئلة حسب الموضوع المختار ---
+if selected_topic == "☑️ الكل (جميع المواضيع)":
+    filtered_questions = questions
+else:
+    filtered_questions = [q for q in questions if q.get('topic', 'مواضيع عامة') == selected_topic]
+
+# --- التحقق من وجود أسئلة في الموضوع المختار ---
+if len(filtered_questions) == 0:
+    st.warning("لا توجد أسئلة في هذا الموضوع حالياً. يرجى إضافة وسوم (topic) للأسئلة في ملفات البيانات.")
+    st.stop()
+
+# --- تهيئة حالة الجلسة (Session State) ---
+# إعادة التعيين إذا تغير الموضوع
+if "current_topic" not in st.session_state or st.session_state.current_topic != selected_topic:
+    st.session_state.current_topic = selected_topic
     st.session_state.index = 0
-if "score" not in st.session_state:
     st.session_state.score = 0
-if "selected_option" not in st.session_state:
     st.session_state.selected_option = None
-if "submitted" not in st.session_state:
     st.session_state.submitted = False
-if "shuffled_questions" not in st.session_state:
-    st.session_state.shuffled_questions = random.sample(questions, len(questions))
+    st.session_state.shuffled_questions = random.sample(filtered_questions, len(filtered_questions))
 
-# التحقق من انتهاء الأسئلة
+# التحقق من انتهاء الأسئلة في هذا الموضوع
 if st.session_state.index >= len(st.session_state.shuffled_questions):
     st.balloons()
-    st.success("🎉 لقد أكملت الاختبار بنجاح!")
-    st.write(f"**نتيجتك النهائية:** {st.session_state.score} من {len(st.session_state.shuffled_questions)}")
-    if st.button("إعادة الاختبار من البداية 🔄"):
+    st.success(f"🎉 لقد أكملت اختبار موضوع '{selected_topic}' بنجاح!")
+    
+    # عرض النتيجة الخاصة بهذا الموضوع فقط
+    total_q = len(st.session_state.shuffled_questions)
+    st.write(f"**نتيجتك في هذا القسم:** {st.session_state.score} من {total_q}")
+    
+    # حساب النسبة المئوية
+    if total_q > 0:
+        percentage = (st.session_state.score / total_q) * 100
+        st.write(f"**نسبة الإتقان:** {percentage:.1f}%")
+    
+    if st.button("🔄 إعادة اختبار هذا الموضوع"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
 else:
     # عرض السؤال الحالي
     current_q = st.session_state.shuffled_questions[st.session_state.index]
-    st.progress((st.session_state.index + 1) / len(st.session_state.shuffled_questions))
-    st.write(f"**السؤال {st.session_state.index + 1} من {len(st.session_state.shuffled_questions)}**")
-    
+    total_q = len(st.session_state.shuffled_questions)
+    st.progress((st.session_state.index + 1) / total_q)
+    st.write(f"**السؤال {st.session_state.index + 1} من {total_q}**")
     st.write(f"**{current_q['q']}**")
+
+    # خلط الخيارات عشوائياً (حل مشكلة توقع الإجابة)
+    shuffled_options = current_q['op'].copy()
+    random.shuffle(shuffled_options)
+
     st.session_state.selected_option = st.radio(
         "اختر الإجابة الصحيحة:",
-        current_q['op'],
+        shuffled_options,
         key=f"q_{st.session_state.index}"
     )
 
@@ -67,3 +97,16 @@ else:
             st.session_state.index += 1
             st.session_state.submitted = False
             st.rerun()
+
+# --- عرض ملخص النتيجة العامة في الشريط الجانبي ---
+with st.sidebar:
+    st.header("📊 إحصائياتك")
+    st.write(f"**الموضوع الحالي:** {selected_topic}")
+    if st.session_state.index > 0:
+        st.write(f"**تقدمك في هذا القسم:** {st.session_state.index} / {len(st.session_state.shuffled_questions)}")
+        st.write(f"**عدد الإجابات الصحيحة:** {st.session_state.score}")
+        if len(st.session_state.shuffled_questions) > 0:
+            percentage = (st.session_state.score / len(st.session_state.shuffled_questions)) * 100
+            st.write(f"**نسبة الإتقان الحالية:** {percentage:.1f}%")
+    else:
+        st.write("لم تبدأ الاختبار بعد...")
