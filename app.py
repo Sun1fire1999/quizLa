@@ -1,6 +1,3 @@
-
-#### 3. ملف `app.py` (التطبيق الرئيسي)
-```python
 import streamlit as st
 import random
 
