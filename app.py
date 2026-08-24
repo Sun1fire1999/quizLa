@@ -91,12 +91,11 @@ else:
     st.write(f"**السؤال {st.session_state.index + 1} من {total_q}**")
     st.write(f"**{current_q['q']}**")
 
-    # --- 6. الحل الجذري: خلط الخيارات عشوائياً قبل عرضها ---
-    # نأخذ الخيارات وننسخها في قائمة جديدة حتى لا نغير البيانات الأصلية
+    # --- 6. خلط الخيارات عشوائياً قبل عرضها ---
     shuffled_options = current_q['op'].copy()
     random.shuffle(shuffled_options)
 
-    # نعرض الخيارات المخلوطة
+    # عرض الخيارات المخلوطة
     st.session_state.selected_option = st.radio(
         "اختر الإجابة الصحيحة:",
         shuffled_options,
@@ -107,14 +106,21 @@ else:
     with col1:
         if st.button("تأكيد الإجابة ✅"):
             st.session_state.submitted = True
-            # نقارن النص المختار بالنص الصحيح (بغض النظر عن ترتيبه)
             if st.session_state.selected_option == current_q['a']:
                 st.success("✅ إجابة صحيحة!")
                 st.session_state.score += 1
             else:
                 st.error(f"❌ إجابة خاطئة. الإجابة الصحيحة هي: {current_q['a']}")
+            
+            # --- 7. عرض نص المادة الحرفي والشرح ---
             if current_q.get('e'):
-                st.info(f"📖 توضيح: {current_q['e']}")
+                # عرض النص الحرفي للمادة (يجب وضعه في ملفات البيانات كـ e)
+                st.info(f"📜 **نص المادة:** {current_q['e']}")
+            
+            # عرض التفسير الإضافي إذا كان موجوداً
+            if current_q.get('explanation'):
+                st.warning(f"💡 **الشرح:** {current_q['explanation']}")
+            # -----------------------------------------------------------
 
     with col2:
         if st.button("السؤال التالي ➡️"):
@@ -122,7 +128,7 @@ else:
             st.session_state.submitted = False
             st.rerun()
 
-# --- 7. عرض ملخص الحالة في الشريط الجانبي ---
+# --- 8. عرض ملخص الحالة في الشريط الجانبي ---
 with st.sidebar:
     st.header("📊 ملخص التقدم")
     st.write(f"**الفئة الحالية:** {current_q.get('topic', 'أحكام عامة وتعريفات (المواد 1-4)')}")
