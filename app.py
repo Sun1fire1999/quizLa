@@ -11,9 +11,9 @@ except ImportError:
     st.stop()
 
 # إعدادات الصفحة
-st.set_page_config(page_title="منصة الحفظ الذكي لقانون العمل", layout="centered")
-st.title("⚡ منصة الحفظ والاختبار الذكي لقانون العمل")
-st.markdown("اختر الموضوع، ثم اختر وضع الحفظ أو الاختبار. سيتم حفظ أخطائك تلقائياً لمراجعتها.")
+st.set_page_config(page_title="منصة تعلم قانون العمل", layout="centered")
+st.title("⚖️ منصة تعلم قانون العمل الأردني")
+st.markdown("اختر الفئة، ثم اختر طريقة التعلم المناسبة لك.")
 
 # --- قائمة الفئات بالترتيب القانوني ---
 ORDERED_TOPICS = [
@@ -59,7 +59,7 @@ with st.sidebar:
     st.divider()
     
     # وضع التدريب
-    mode = st.radio("وضع التدريب:", ["📖 وضع الحفظ", "📝 وضع الاختبار"])
+    mode = st.radio("طريقة التعلم:", ["📖 التعلم بالقراءة (نص ثم سؤال)", "📝 الاختبار التقليدي"])
     
     st.divider()
     st.subheader("📊 إحصائياتك")
@@ -67,10 +67,9 @@ with st.sidebar:
         st.session_state.mistakes = []
     
     st.write(f"**عدد الأخطاء:** {len(st.session_state.mistakes)}")
-    if len(st.session_state.mistakes) > 0:
-        if st.button("🔄 مراجعة الأخطاء (إعادة الحل)"):
-            # إعادة تعيين الأسئلة لتشمل الأخطاء فقط
-            pass  # سنتعامل معها لاحقاً في الكود
+    if st.button("🔄 مسح الأخطاء"):
+        st.session_state.mistakes = []
+        st.rerun()
 
 # --- تهيئة حالة الجلسة ---
 if "current_index" not in st.session_state:
@@ -79,12 +78,8 @@ if "score" not in st.session_state:
     st.session_state.score = 0
 if "answered" not in st.session_state:
     st.session_state.answered = False
-if "reveal" not in st.session_state:
-    st.session_state.reveal = False
 if "user_choice" not in st.session_state:
     st.session_state.user_choice = None
-if "mistakes" not in st.session_state:
-    st.session_state.mistakes = []
 
 # التأكد من أن الفهرس صحيح
 if len(filtered_questions) > 0:
@@ -98,36 +93,28 @@ if len(filtered_questions) > 0:
     st.write(f"**الموضوع:** {selected_topic}")
     st.write(f"**السؤال {st.session_state.current_index + 1} من {len(filtered_questions)}**")
 
-    # ===== وضع الحفظ (الاستذكار) =====
-    if mode == "📖 وضع الحفظ":
-        st.info(f"**{current_q['q']}**")
+    # ==========================================
+    # وضع "التعلم بالقراءة" (الاقتراح الجديد)
+    # ==========================================
+    if mode == "📖 التعلم بالقراءة (نص ثم سؤال)":
         
-        if st.session_state.reveal:
-            # عرض النص الكامل للمادة
-            if current_q.get('e'):
-                st.success(f"📜 **نص المادة:**\n\n{current_q['e']}")
-            else:
-                st.warning("لا يوجد نص مادة في البيانات لهذا السؤال. تأكد من تعبئة الحقل 'e'.")
-            
-            if st.button("السؤال التالي ➡️"):
-                st.session_state.current_index += 1
-                st.session_state.reveal = False
-                st.rerun()
+        # 1. عرض نص المادة أولاً
+        if current_q.get('e'):
+            st.info(f"📜 **نص المادة:**\n\n{current_q['e']}")
         else:
-            if st.button("👁️ إظهار الإجابة والنص"):
-                st.session_state.reveal = True
-                st.rerun()
-    
-    # ===== وضع الاختبار =====
-    elif mode == "📝 وضع الاختبار":
-        st.write(f"**{current_q['q']}**")
+            st.warning("لا يوجد نص مادة مرفق لهذا السؤال في البيانات.")
+            
+        st.divider()
         
-        # عرض الخيارات بترتيبها الثابت
+        # 2. عرض السؤال تحته
+        st.markdown(f"### ❓ السؤال: {current_q['q']}")
+        
+        # 3. عرض الخيارات
         user_choice = st.radio(
             "اختر الإجابة الصحيحة:",
             current_q['op'],
-            key=f"radio_{st.session_state.current_index}",
-            index=None  # لا يوجد خيار محدد مسبقاً
+            key=f"radio_read_{st.session_state.current_index}",
+            index=None
         )
         
         col1, col2, col3 = st.columns(3)
@@ -135,7 +122,53 @@ if len(filtered_questions) > 0:
             if st.button("⬅️ السابق", disabled=(st.session_state.current_index == 0)):
                 st.session_state.current_index -= 1
                 st.session_state.answered = False
-                st.session_state.reveal = False
+                st.rerun()
+        
+        with col2:
+            if st.button("✅ تأكيد"):
+                st.session_state.answered = True
+                st.session_state.user_choice = user_choice
+                if user_choice == current_q['a']:
+                    st.session_state.score += 1
+                else:
+                    # حفظ الخطأ
+                    st.session_state.mistakes.append(current_q)
+                st.rerun()
+        
+        with col3:
+            if st.button("التالي ➡️", disabled=(st.session_state.current_index == len(filtered_questions) - 1)):
+                st.session_state.current_index += 1
+                st.session_state.answered = False
+                st.rerun()
+
+        if st.session_state.answered:
+            st.divider()
+            if st.session_state.user_choice == current_q['a']:
+                st.success("🎉 إجابة صحيحة!")
+            else:
+                st.error(f"❌ إجابة خاطئة. الإجابة الصحيحة هي: {current_q['a']}")
+                st.warning("تم حفظ هذا السؤال في قائمة الأخطاء الخاصة بك.")
+
+    # ==========================================
+    # وضع "الاختبار التقليدي" (الوضع السابق)
+    # ==========================================
+    elif mode == "📝 الاختبار التقليدي":
+        
+        # عرض السؤال فقط
+        st.markdown(f"### ❓ {current_q['q']}")
+        
+        user_choice = st.radio(
+            "اختر الإجابة الصحيحة:",
+            current_q['op'],
+            key=f"radio_test_{st.session_state.current_index}",
+            index=None
+        )
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("⬅️ السابق", disabled=(st.session_state.current_index == 0)):
+                st.session_state.current_index -= 1
+                st.session_state.answered = False
                 st.rerun()
         
         with col2:
@@ -145,7 +178,6 @@ if len(filtered_questions) > 0:
                 if user_choice == current_q['a']:
                     st.session_state.score += 1
                 else:
-                    # حفظ الخطأ في قائمة الأخطاء
                     st.session_state.mistakes.append(current_q)
                 st.rerun()
         
@@ -153,46 +185,42 @@ if len(filtered_questions) > 0:
             if st.button("التالي ➡️", disabled=(st.session_state.current_index == len(filtered_questions) - 1)):
                 st.session_state.current_index += 1
                 st.session_state.answered = False
-                st.session_state.reveal = False
                 st.rerun()
 
-        # عرض نتيجة التصحيح ونص المادة
+        # عند التأكيد يظهر النص
         if st.session_state.answered:
             st.divider()
             if st.session_state.user_choice == current_q['a']:
                 st.success("🎉 إجابة صحيحة!")
             else:
                 st.error(f"❌ إجابة خاطئة. الإجابة الصحيحة هي: {current_q['a']}")
-                st.warning("تمت إضافة هذا السؤال إلى مجلد الأخطاء.")
             
+            # عرض نص المادة للتوضيح بعد الإجابة
             if current_q.get('e'):
                 st.info(f"📜 **نص المادة:**\n\n{current_q['e']}")
-            else:
-                st.info("لا يوجد نص مادة مرفق.")
 
-    # ===== نهاية الاختبار =====
+    # ===== عرض نتيجة الاختبار في نهاية القسم =====
     if st.session_state.current_index == len(filtered_questions) - 1 and st.session_state.answered:
         st.divider()
-        st.subheader("🏁 نتيجة الاختبار النهائية")
+        st.subheader("🏁 نتيجة هذا القسم")
         st.write(f"**النتيجة:** {st.session_state.score} من {len(filtered_questions)}")
         if len(filtered_questions) > 0:
             pct = (st.session_state.score / len(filtered_questions)) * 100
             st.write(f"**نسبة الإتقان:** {pct:.1f}%")
         
         if len(st.session_state.mistakes) > 0:
-            st.warning(f"⚠️ لديك **{len(st.session_state.mistakes)}** سؤالاً خاطئاً.")
-            if st.button("🔁 إعادة حل الأخطاء"):
-                # عرض الأسئلة الخاطئة فقط
-                # سنقوم بتحديث state ليدخل في وضع مراجعة الأخطاء
-                st.session_state.filtered_questions = st.session_state.mistakes
-                st.session_state.current_index = 0
-                st.session_state.mistakes = []
-                st.session_state.answered = False
-                st.rerun()
+            st.warning(f"⚠️ لديك **{len(st.session_state.mistakes)}** سؤالاً في مجلد الأخطاء (ستظهر لك عند إعادة المحاولة).")
+        
+        if st.button("🔄 إعادة هذا القسم"):
+            st.session_state.current_index = 0
+            st.session_state.score = 0
+            st.session_state.answered = False
+            st.rerun()
 
-# عرض زر إعادة الاختبار
+# زر إعادة التطبيق بالكامل
 with st.sidebar:
-    if st.button("🔄 إعادة من الصفر"):
+    st.divider()
+    if st.button("🔄 تصفير كل شيء"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
