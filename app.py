@@ -1,6 +1,7 @@
 import streamlit as st
+import random
 
-# استيراد البيانات
+# استيراد البيانات من الملفات المنفصلة
 try:
     from data_part1 import questions_1
     from data_part2 import questions_2
@@ -10,8 +11,12 @@ except ImportError:
     st.error("⚠️ يرجى التأكد من وجود ملفات البيانات (data_part1.py, data_part2.py, data_part3.py) في نفس المجلد.")
     st.stop()
 
-# --- 1. تعريف الترتيب القانوني الصارم للفئات (مواد القانون) ---
-# الترتيب الذي ستظهر به الأسئلة
+# إعدادات الصفحة
+st.set_page_config(page_title="اختبار قانون العمل الأردني (100%)", layout="centered")
+st.title("📝 اختبار شامل في قانون العمل الأردني")
+st.markdown("تغطية 100% لنصوص قانون العمل رقم 8 لسنة 1996 وقانون العمل المهني رقم 11 لسنة 2019.")
+
+# --- 1. تعريف الترتيب القانوني الصارم للفئات ---
 ORDERED_TOPICS = [
     "أحكام عامة وتعريفات (المواد 1-4)",
     "التفتيش على العمل والرقابة (المواد 5-10)",
@@ -40,12 +45,7 @@ def get_topic_order(topic):
 # نقوم بترتيب الأسئلة مرة واحدة في الذاكرة
 SORTED_QUESTIONS = sorted(questions, key=lambda q: get_topic_order(q.get('topic', '')))
 
-# --- 3. إعدادات الصفحة ---
-st.set_page_config(page_title="قانون العمل - تدريب متسلسل", layout="centered")
-st.title("📖 التدريب المتسلسل على قانون العمل")
-st.markdown("تعتمد هذه الدورة على تسلسل مواد القانون. ركز في كل فئة قبل الانتقال للفئة التالية.")
-
-# --- 4. تهيئة حالة الجلسة (Session State) ---
+# --- 3. تهيئة حالة الجلسة (Session State) ---
 if "index" not in st.session_state:
     st.session_state.index = 0
 if "score" not in st.session_state:
@@ -55,7 +55,7 @@ if "selected_option" not in st.session_state:
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 
-# --- 5. التحقق من انتهاء الأسئلة ---
+# --- 4. التحقق من انتهاء الأسئلة ---
 if st.session_state.index >= len(SORTED_QUESTIONS):
     st.balloons()
     st.success("🎉 لقد أكملت التدريب على تسلسل القانون بالكامل!")
@@ -77,25 +77,29 @@ else:
     # شريط التقدم
     st.progress((st.session_state.index + 1) / total_q)
 
-    # --- 6. عرض عنوان الفئة عند بداية كل قسم جديد ---
-    # نتحقق من السؤال السابق (إذا كان موجوداً) لنعرف هل تغيرت الفئة
+    # --- 5. عرض عنوان الفئة عند بداية كل قسم جديد ---
     previous_q = SORTED_QUESTIONS[st.session_state.index - 1] if st.session_state.index > 0 else None
     current_topic = current_q.get('topic', 'أحكام عامة وتعريفات (المواد 1-4)')
     
     if previous_q is None or previous_q.get('topic', '') != current_topic:
         st.divider()
         st.header(f"📍 {current_topic}")
-        st.caption(f"هذا القسم يغطي مواد محددة من القانون. تقدم بالترتيب.")
+        st.caption("هذا القسم يغطي مواد محددة من القانون. تقدم بالترتيب.")
         st.divider()
 
     # عرض السؤال
     st.write(f"**السؤال {st.session_state.index + 1} من {total_q}**")
     st.write(f"**{current_q['q']}**")
 
-    # عرض الخيارات (بدون خلط عشوائي للحفاظ على تجربة التدريب المنتظمة)
+    # --- 6. الحل الجذري: خلط الخيارات عشوائياً قبل عرضها ---
+    # نأخذ الخيارات وننسخها في قائمة جديدة حتى لا نغير البيانات الأصلية
+    shuffled_options = current_q['op'].copy()
+    random.shuffle(shuffled_options)
+
+    # نعرض الخيارات المخلوطة
     st.session_state.selected_option = st.radio(
         "اختر الإجابة الصحيحة:",
-        current_q['op'],
+        shuffled_options,
         key=f"q_{st.session_state.index}"
     )
 
@@ -103,6 +107,7 @@ else:
     with col1:
         if st.button("تأكيد الإجابة ✅"):
             st.session_state.submitted = True
+            # نقارن النص المختار بالنص الصحيح (بغض النظر عن ترتيبه)
             if st.session_state.selected_option == current_q['a']:
                 st.success("✅ إجابة صحيحة!")
                 st.session_state.score += 1
