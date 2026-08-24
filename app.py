@@ -1,4 +1,6 @@
 import streamlit as st
+import json
+from datetime import datetime
 
 # استيراد البيانات
 try:
@@ -13,7 +15,7 @@ except ImportError:
 # إعدادات الصفحة
 st.set_page_config(page_title="منصة تعلم قانون العمل", layout="centered")
 st.title("⚖️ منصة تعلم قانون العمل الأردني")
-st.markdown("اختر الفئة، ثم اختر طريقة التعلم المناسبة لك.")
+st.markdown("اختر الفئة، ثم اختر طريقة التعلم المناسبة لك. **احفظ تقدمك من الشريط الجانبي**.")
 
 # --- قائمة الفئات بالترتيب القانوني ---
 ORDERED_TOPICS = [
@@ -71,6 +73,46 @@ with st.sidebar:
         st.session_state.mistakes = []
         st.rerun()
 
+    st.divider()
+    st.subheader("💾 حفظ واستئناف التقدم")
+    
+    # زر حفظ التقدم
+    if st.button("⬇️ تحميل ملف التقدم"):
+        progress_data = {
+            "selected_topic": selected_topic,
+            "mode": mode,
+            "current_index": st.session_state.get("current_index", 0),
+            "score": st.session_state.get("score", 0),
+            "mistakes": [q["id"] for q in st.session_state.get("mistakes", [])],
+            "saved_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        st.download_button(
+            label="اضغط هنا للتنزيل",
+            data=json.dumps(progress_data, ensure_ascii=False, indent=2),
+            file_name="progress_backup.json",
+            mime="application/json"
+        )
+        st.info("تم تجهيز الملف. اضغط على زر التنزيل أعلاه.")
+
+    # زر استئناف التقدم (رفع ملف)
+    uploaded_file = st.file_uploader("رفع ملف التقدم", type=["json"])
+    if uploaded_file is not None:
+        try:
+            data = json.loads(uploaded_file.getvalue())
+            # استرجاع البيانات
+            st.session_state.current_index = data.get("current_index", 0)
+            st.session_state.score = data.get("score", 0)
+            st.session_state.mistakes = [q for q in questions if q["id"] in data.get("mistakes", [])]
+            st.success(f"✅ تم استئناف التقدم من السؤال {st.session_state.current_index + 1}")
+            # إعادة تعيين الحالة الحالية بناء على الملف
+            if "selected_topic" in data:
+                selected_topic = data["selected_topic"]
+            if "mode" in data:
+                mode = data["mode"]
+            st.rerun()
+        except Exception as e:
+            st.error(f"خطأ في قراءة الملف: {e}")
+
 # --- تهيئة حالة الجلسة ---
 if "current_index" not in st.session_state:
     st.session_state.current_index = 0
@@ -93,14 +135,23 @@ if len(filtered_questions) > 0:
     st.write(f"**الموضوع:** {selected_topic}")
     st.write(f"**السؤال {st.session_state.current_index + 1} من {len(filtered_questions)}**")
 
+    # دالة مساعدة للتحقق من طول النص
+    def get_full_text(text):
+        if text and len(text) > 30:  # إذا كان النص طويلاً (نص كامل)
+            return text
+        elif text:  # إذا كان قصيراً (مثل "وفقاً للمادة")
+            return text + "  \n⚠️ (ملاحظة: النص الكامل للمادة غير مضاف في ملف البيانات)" 
+        else:
+            return "لا يوجد نص مادة مرفق لهذا السؤال."
+
     # ==========================================
-    # وضع "التعلم بالقراءة" (الاقتراح الجديد)
+    # وضع "التعلم بالقراءة" (نص ثم سؤال)
     # ==========================================
     if mode == "📖 التعلم بالقراءة (نص ثم سؤال)":
         
         # 1. عرض نص المادة أولاً
         if current_q.get('e'):
-            st.info(f"📜 **نص المادة:**\n\n{current_q['e']}")
+            st.info(f"📜 **نص المادة:**\n\n{get_full_text(current_q['e'])}")
         else:
             st.warning("لا يوجد نص مادة مرفق لهذا السؤال في البيانات.")
             
@@ -131,7 +182,6 @@ if len(filtered_questions) > 0:
                 if user_choice == current_q['a']:
                     st.session_state.score += 1
                 else:
-                    # حفظ الخطأ
                     st.session_state.mistakes.append(current_q)
                 st.rerun()
         
@@ -150,11 +200,10 @@ if len(filtered_questions) > 0:
                 st.warning("تم حفظ هذا السؤال في قائمة الأخطاء الخاصة بك.")
 
     # ==========================================
-    # وضع "الاختبار التقليدي" (الوضع السابق)
+    # وضع "الاختبار التقليدي"
     # ==========================================
     elif mode == "📝 الاختبار التقليدي":
         
-        # عرض السؤال فقط
         st.markdown(f"### ❓ {current_q['q']}")
         
         user_choice = st.radio(
@@ -197,7 +246,7 @@ if len(filtered_questions) > 0:
             
             # عرض نص المادة للتوضيح بعد الإجابة
             if current_q.get('e'):
-                st.info(f"📜 **نص المادة:**\n\n{current_q['e']}")
+                st.info(f"📜 **نص المادة:**\n\n{get_full_text(current_q['e'])}")
 
     # ===== عرض نتيجة الاختبار في نهاية القسم =====
     if st.session_state.current_index == len(filtered_questions) - 1 and st.session_state.answered:
@@ -209,7 +258,7 @@ if len(filtered_questions) > 0:
             st.write(f"**نسبة الإتقان:** {pct:.1f}%")
         
         if len(st.session_state.mistakes) > 0:
-            st.warning(f"⚠️ لديك **{len(st.session_state.mistakes)}** سؤالاً في مجلد الأخطاء (ستظهر لك عند إعادة المحاولة).")
+            st.warning(f"⚠️ لديك **{len(st.session_state.mistakes)}** سؤالاً في مجلد الأخطاء.")
         
         if st.button("🔄 إعادة هذا القسم"):
             st.session_state.current_index = 0
